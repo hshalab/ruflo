@@ -147,8 +147,13 @@ async function main() {
     // pushed metaharness_audit_list past the prior 30s budget intermittently.
     // iter 128 — oia_audit composes 5 sub-audits; same 90s budget as
     // drift_from_history (also a chain-tool).
+    // iter 130 — also bump audit_list to 90s. In CI cold-cache, even after
+    // oia_audit warmed up the npx cache, audit_list still timed out at 60s
+    // (likely the memory `npx claude-flow memory list` invocation hits its
+    // own cold path). audit_list is in the chain-tool bracket too.
     const isChainTool = tool.name === 'metaharness_drift_from_history'
-      || tool.name === 'metaharness_oia_audit';
+      || tool.name === 'metaharness_oia_audit'
+      || tool.name === 'metaharness_audit_list';
     const timeoutMs = isChainTool ? 90_000 : 60_000;
     const handlerPromise = tool.handler(input);
     const timeoutPromise = new Promise((_, reject) =>
