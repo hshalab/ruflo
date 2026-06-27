@@ -1258,6 +1258,18 @@ export const agentdbGraphPathfinder: MCPTool = {
         ? 'source_id, target_id, weight, last_reinforced, confidence'
         : 'source_id, target_id, weight';
 
+      // Early-exit optimization: if seedNodeId has no incident edges,
+      // skip the full edge-table scan + PPR matrix build entirely.
+      // EXISTS query is O(index lookup) vs O(N) full scan + JS allocation.
+      try {
+        const seedHit = db.prepare(
+          `SELECT 1 FROM graph_edges WHERE source_id = ? OR target_id = ? LIMIT 1`,
+        ).raw().all(seedNodeId, seedNodeId) as unknown[][];
+        if (seedHit.length === 0) {
+          return { success: true, paths: [], count: 0, message: 'seedNodeId not present in graph_edges', seedNodeId, algorithm, elapsedMs: Date.now() - t0, budgetUsed: { millis: Date.now() - t0, nodes: 0 } };
+        }
+      } catch { /* fall through to full scan on probe failure */ }
+
       // better-sqlite3 API — see graph-query comment above; sql.js-style
       // `db.exec(sql, params)` throws "datatype mismatch" here.
       const rawEdges = db.prepare(
